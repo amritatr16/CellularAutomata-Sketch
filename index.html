@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Layered Light — standalone</title>
+<style>
+:root{--bg:#f4efe7;--fg:#1c1814;--mut:#6b6258;--card:#e9e2d6;--acc:#c2410c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#100d12;--fg:#efe8dd;--mut:#a39a8e;--card:#1d1820;--acc:#fb923c}}
+:root[data-theme="dark"]{--bg:#100d12;--fg:#efe8dd;--mut:#a39a8e;--card:#1d1820;--acc:#fb923c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1160px;margin:0 auto;padding:20px 16px 32px}
+h1{font-size:22px;margin:0 0 4px;font-weight:600}.sub{margin:0 0 16px;color:var(--mut)}
+.wrap{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start}
+canvas{display:block;max-width:100%;height:auto;touch-action:none}
+#A{width:400px;border-radius:50%;box-shadow:0 0 70px rgba(255,190,110,.22);cursor:grab}
+#P{width:400px;border-radius:10px;cursor:grab}
+#Sc,#Dc{width:400px;border-radius:10px;background:#14110e}
+.ar{display:flex;align-items:center;gap:8px;min-width:240px;font-size:13px;color:var(--mut)}.ar i{width:14px;height:14px;border-radius:3px;display:inline-block}.ar input{flex:1}.ar b{width:40px;text-align:right}
+#B{width:220px;background:var(--card);border-radius:12px}
+figure{margin:0;text-align:center}figcaption{color:var(--mut);font-size:13px;margin-top:8px}
+.sl{display:flex;flex-wrap:wrap;gap:6px 22px;justify-content:center;margin:18px 0 6px}.sl label{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--mut);min-width:170px}.sl input{width:100%}
+.bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:18px 0 8px}
+button{font:inherit;color:var(--fg);background:var(--card);border:1px solid transparent;border-radius:999px;padding:8px 16px;cursor:pointer}
+button.on{border-color:var(--acc);color:var(--acc)}
+.note{color:var(--mut);text-align:center;margin:8px auto 0;max-width:640px}
+.lz{margin-top:26px;text-align:center}.lz h2{font-size:16px;margin:0 0 4px;font-weight:600}
+.pr{max-width:640px;margin:36px auto 0;padding-top:20px;border-top:1px solid var(--card)}.pr h2{font-size:16px;margin:0 0 10px;font-weight:600}.pr p{margin:0 0 9px}
+</style></head><body><main>
+<h1>Layered light</h1>
+<p class="sub">Four coloured acrylic discs, each laser-cut with its own automaton pattern, stacked on one axle in front of a light. Drag any tier's rim to rotate that layer.</p>
+<div class="wrap"><figure><canvas id="A" width="800" height="800"></canvas><figcaption>Looking into the lamp (drag a rim)</figcaption></figure><figure><canvas id="P" width="800" height="800"></canvas><figcaption>Projected on a wall (drag it to rotate too)</figcaption></figure><figure id="pf" hidden><canvas id="Sc" width="400" height="400"></canvas><figcaption>Pinned for comparison</figcaption></figure><figure id="df" hidden><canvas id="Dc" width="200" height="200"></canvas><figcaption>What changed since the pin</figcaption></figure><figure><canvas id="B" width="420" height="760"></canvas><figcaption>Exploded side view</figcaption></figure></div>
+<div class="sl" id="ang"></div>
+<div class="sl"><label>Layer gap: <b id="gv">12</b> mm<input id="gap" type="range" min="0" max="60" value="12"></label><label>Light size: <b id="lv">3</b> mm<input id="lit" type="range" min="0" max="12" value="3"></label><label>Light opening: <b id="ov">90</b>%<input id="opn" type="range" min="40" max="95" value="90"></label><label>View angle: <b id="vv">14</b>°<input id="vie" type="range" min="0" max="40" value="14"></label></div>
+<div class="bar">
+<button id="sty">Style: random</button><button id="mat">Material: translucent</button><button id="lc">Light colour</button><button id="drift">Drift</button><button id="mix">Symmetry: same</button>
+<button id="pal">Palette</button><button id="roll">New layers</button><button id="zero">Align</button><button id="pin">Pin this view</button><button id="unpin">Clear pin</button></div>
+<p class="note">Same symmetry on every layer means the glow is always an N-fold mandala, however you turn them. Mixed symmetries rarely repeat, and "none" removes symmetry altogether, so every rotation is a one-off composition. Colours multiply where layers overlap, like real filters. In the projection, each layer sits a different distance from the light, so layers farther from it cast smaller patterns and stop lining up as you widen the gap. A bigger light source softens the edges. The gap also shifts the look when you view the lamp from an angle.</p>
+<p class="note" id="mn"></p>
+<section id="lz" class="lz"><h2>Laser files</h2>
+<div class="sl"><label>Plate diameter (layer 1): <b id="dv">150</b> mm<input id="dia" type="range" min="80" max="200" step="5" value="150"></label><label>Axle hole: <b id="xv">8</b> mm<input id="axl" type="range" min="3" max="20" value="8"></label></div>
+<div class="bar"><button data-l="0">Layer 1</button><button data-l="1">Layer 2</button><button data-l="2">Layer 3</button><button data-l="3">Layer 4</button><button data-l="all">All, one sheet</button></div>
+<p class="note" id="lmsg">Downloads the layers as they are now (same style, seeds and rotation-free), as SVG in millimetres. Cut lines are red hairlines. Other layers scale down in the same steps as on screen.</p></section>
+<section class="pr"><h2>Proposal</h2>
+<p><b>Idea.</b> Working with light and radial symmetry, this piece explores how scale can be magnified: small, precisely cut patterns in a few centimetres of acrylic are thrown outward as large forms of light, and shift as the layers are turned.</p>
+<p><b>System.</b> Each layer is grown by a cellular automaton on a circular grid, started from a random seed. The history of its growth becomes the cut pattern, so every layer, and every combination of rotations, is unique.</p>
+<p><b>Form.</b> A lampshade or projection lamp: a rotating stack of discs around a central light, glowing when seen directly and casting patterns onto walls and ceiling.</p>
+<p><b>Materials.</b> 2–3 mm cast acrylic, laser cut and engraved; warm-white LED light; plywood or 3D-printed base.</p>
+<p><b>Scale.</b> Four layers, each 10–15 cm in diameter, stepped about 1 cm apart so every rim can be turned, with 1–2 cm gaps between them. Roughly 20 cm tall overall. A few centimetres from the light, a layer can throw a pattern over a metre wide.</p></section>
+</main>
+<script>
+const K = 4, S = 800, C = S / 2, RAD = [380, 345, 310, 275];
+const PALS = [
+  ['#00b4ff', '#ff1f9a', '#ffe11a', '#6a5a78'],
+  ['#ffb02e', '#ff4d7a', '#8e3cf0', '#12b5a8'],
+  ['#12d6a0', '#1f6bff', '#a33bff', '#ffd23f'],
+  ['#c8553d', '#e0a526', '#2a9d8f', '#3d5a80']
+];
+let pal = 3, mixed = false, drift = false, dirty = true;
+let gapMM = 12, lightMM = 3, viewDeg = 14, symMode = 0, openShare = 0.9, style = 1;
+let seeds = [11, 22, 33, 44], holes = [], imgs = [], imgsK = [], ang = [0, 0, 0, 0], opaque = false;
+const A = document.getElementById('A'), B = document.getElementById('B'), P = document.getElementById('P');
+const a = A.getContext('2d'), b = B.getContext('2d'), p = P.getContext('2d');
+
+function rng(s) { return function () { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+// one layer = a polar cellular automaton run in a mirrored wedge, replayed N-fold
+function makeHoles(seed, N, share, sc) {
+  const r = rng(seed), H = 18, W = 6, R0 = 3, M = 2 * W * N, dl = Math.PI * 2 / M;
+  let c = new Uint8Array(H * W), n = new Uint8Array(H * W);
+  const hits = new Uint16Array(H * W), star = r() < 0.5, C_ = star ? 4 : 3;
+  const plant = function () { const rr = Math.floor(r() * H), ss = Math.floor(r() * W);
+    for (let i = -1; i <= 1; i++) { for (let j = -1; j <= 1; j++) {
+      const y = rr + i, x = ss + j; if (y >= 0 && y < H && x >= 0 && x < W && r() < 0.6) { c[y * W + x] = 1; } } } };
+  for (let k = 0; k < 7; k++) { plant(); }
+  for (let g = 0; g < 150; g++) {
+    let alive = 0;
+    for (let y = 0; y < H; y++) { for (let x = 0; x < W; x++) {
+      const st = c[y * W + x]; let cnt = 0;
+      for (let i = -1; i <= 1; i++) { const yy = y + i; if (yy < 0 || yy >= H) { continue; }
+        for (let j = -1; j <= 1; j++) { if (!i && !j) { continue; }
+          const xx = x + j < 0 ? 0 : (x + j >= W ? W - 1 : x + j);
+          if (c[yy * W + xx] === 1) { cnt++; } } }
+      let v;
+      if (st === 0) { v = cnt === 2 ? 1 : 0; }
+      else if (st === 1) { v = (star && cnt >= 3 && cnt <= 5) ? 1 : 2; }
+      else { v = (st + 1) % C_; }
+      n[y * W + x] = v; if (v) { alive++; }
+      if (v === 1 && st !== 1) { hits[y * W + x]++; } } }
+    const t = c; c = n; n = t;
+    if (!alive) { plant(); }
+  }
+  const sorted = Array.from(hits).sort(function (p, q) { return q - p; });
+  const thr = Math.max(1, sorted[Math.floor(sorted.length * share)]), mx = Math.max(1, sorted[0]), out = [];
+  for (let y = 0; y < H; y++) { const rr = (y + R0 + 0.5) / (H + R0), sp = rr * dl;
+    for (let j = 0; j < M; j++) {
+      const i = j % (2 * W), s = i < W ? W - 1 - i : i - W, h = hits[y * W + s];
+      if (h < thr) { continue; }
+      const sz = Math.min(1 / (H + R0), sp) * (sc || 0.41) * (0.55 + 0.45 * h / mx);
+      if (sz < 0.008) { continue; }
+      const t = (j - W + 0.5) * dl; out.push([rr * Math.cos(t), rr * Math.sin(t), sz]); } }
+  return out;
+}
+// Inspired by the idea of a symmetrical "heart" of chambers with corridors of one constant width,
+// wrapped by a loose, asymmetric, intertwining "soul". Every cut is a slot of the same width w; short
+// uncut bridges keep the acrylic in one piece.
+function makeHeartSoul(seed, N, w) {
+  const r = rng(seed), out = [], TAU = Math.PI * 2, hw = Math.PI / N;
+  const dot = function (x, y) { out.push([x, y, w / 2]); };
+  const rep = function (fn) { for (let j = 0; j < N; j++) { for (let s = -1; s <= 1; s += 2) { fn(j * 2 * hw, s); } } };
+  out.push([0, 0, w * 0.9]);
+  // heart: concentric rings split into a random number of chambers, joined by radial corridors, mirrored N times
+  const m = 3 + Math.floor(r() * 3), rad = [];
+  for (let k = 0; k < m; k++) { rad.push(0.13 + (k + 0.5) * 0.33 / m); }
+  rad.forEach(function (R, k) {
+    const c = 1 + Math.floor(r() * 3), cuts = [0, hw];
+    for (let q = 1; q < c; q++) { cuts.push(hw * (q + (r() - 0.5) * 0.5) / c); }
+    cuts.sort(function (u, v) { return u - v; });
+    const g = w * 1.2 / R, kk = r() < 0.5 ? Math.cos(hw) : 0.55 + r() * 0.2;   // polygon ring or star ring
+    const Bx = R * kk * Math.cos(hw), By = R * kk * Math.sin(hw), edgeL = Math.hypot(Bx - R, By);
+    for (let q = 0; q < cuts.length - 1; q++) {
+      const a0 = cuts[q] + g, a1 = cuts[q + 1] - g;
+      if (a1 <= a0) { continue; }
+      const n = Math.ceil((a1 - a0) / hw * edgeL / (w * 0.5));
+      for (let t = 0; t <= n; t++) {
+        const u = (a0 + (a1 - a0) * t / n) / hw, px = R + (Bx - R) * u, py = By * u;
+        rep(function (b, s) { dot(px * Math.cos(b) - s * py * Math.sin(b), px * Math.sin(b) + s * py * Math.cos(b)); });
+      }
+    }
+    if (k < m - 1 && r() < 0.8) {   // straight spoke on ONE mirror axis only, so no chamber is sealed off
+      const f = r() < 0.5 ? 1 : Math.cos(hw), a = f === 1 ? 0 : hw, n = Math.ceil((rad[k + 1] - R) * f / (w * 0.5));
+      for (let t = 0; t <= n; t++) {
+        const rr = (R + (rad[k + 1] - R) * t / n) * f;
+        rep(function (b, s) { dot(rr * Math.cos(b + s * a), rr * Math.sin(b + s * a)); });
+      }
+    }
+  });
+  // soul: streamlines of a seeded noise field, not symmetric at all, spreading out to the rim
+  const G = 12, gv = [];
+  for (let i = 0; i < G * G; i++) { gv.push(r()); }
+  const nz = function (x, y) {
+    const u = (x + 1) * 0.5 * (G - 2), v = (y + 1) * 0.5 * (G - 2), i = Math.floor(u), j = Math.floor(v);
+    const fx = u - i, fy = v - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = gv[j * G + i], b = gv[j * G + i + 1], c = gv[(j + 1) * G + i], d = gv[(j + 1) * G + i + 1];
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+  const ns = 8 + Math.floor(r() * 6), K = r() < 0.5 ? 6 : 8, stepA = TAU / K;   // soul lines turn only by 60 or 45 degrees
+  for (let c = 0; c < ns; c++) {
+    const a = r() * TAU, rr = 0.5 + r() * 0.1;
+    let x = rr * Math.cos(a), y = rr * Math.sin(a), hi = Math.round(a / stepA), seg = 0, segLen = 8 + Math.floor(r() * 14);
+    for (let st = 0; st < 300; st++) {
+      const rd = Math.hypot(x, y);
+      if (rd > 0.965) { break; }
+      const o = Math.atan2(y, x);
+      if (seg++ >= segLen || rd < 0.5) {
+        seg = 0; segLen = 8 + Math.floor(r() * 14);
+        hi += (r() < 0.5 ? 1 : -1) * (r() < 0.75 ? 1 : 2);
+        const dd = Math.atan2(Math.sin(hi * stepA - o), Math.cos(hi * stepA - o));
+        if (Math.abs(dd) > 1.7) { hi += dd > 0 ? -1 : 1; }   // keep drifting outward
+      }
+      const h = hi * stepA;
+      x += Math.cos(h) * 0.011; y += Math.sin(h) * 0.011;
+      if (st % 30 < 27) { dot(x, y); }
+    }
+  }
+  return out;
+}
+function makeFree(seed, M, H, share, sc) {   // no wedge, no mirror: the automaton wraps all the way round the disc
+  const r = rng(seed), R0 = 3, dl = Math.PI * 2 / M;
+  let c = new Uint8Array(H * M), n = new Uint8Array(H * M);
+  const hits = new Uint16Array(H * M), star = r() < 0.5, C_ = star ? 4 : 3;
+  const plant = function () { const rr = Math.floor(r() * H), ss = Math.floor(r() * M);
+    for (let i = -1; i <= 1; i++) { for (let j = -1; j <= 1; j++) {
+      const y = rr + i, x = (ss + j + M) % M;
+      if (y >= 0 && y < H && r() < 0.6) { c[y * M + x] = 1; } } } };
+  for (let k = 0; k < 18; k++) { plant(); }
+  for (let g = 0; g < 150; g++) {
+    let alive = 0;
+    for (let y = 0; y < H; y++) { for (let x = 0; x < M; x++) {
+      const st = c[y * M + x]; let cnt = 0;
+      for (let i = -1; i <= 1; i++) { const yy = y + i; if (yy < 0 || yy >= H) { continue; }
+        for (let j = -1; j <= 1; j++) { if (!i && !j) { continue; }
+          if (c[yy * M + (x + j + M) % M] === 1) { cnt++; } } }
+      let v;
+      if (st === 0) { v = cnt === 2 ? 1 : 0; }
+      else if (st === 1) { v = (star && cnt >= 3 && cnt <= 5) ? 1 : 2; }
+      else { v = (st + 1) % C_; }
+      n[y * M + x] = v; if (v) { alive++; }
+      if (v === 1 && st !== 1) { hits[y * M + x]++; } } }
+    const t = c; c = n; n = t;
+    if (!alive) { plant(); }
+  }
+  const sorted = Array.from(hits).sort(function (p, q) { return q - p; });
+  const thr = Math.max(1, sorted[Math.floor(sorted.length * share)]), mx = Math.max(1, sorted[0]), out = [];
+  for (let y = 0; y < H; y++) { const rr = (y + R0 + 0.5) / (H + R0), sp = rr * dl;
+    for (let j = 0; j < M; j++) {
+      const h = hits[y * M + j]; if (h < thr) { continue; }
+      const sz = Math.min(1 / (H + R0), sp) * (sc || 0.41) * (0.55 + 0.45 * h / mx);
+      if (sz < 0.008) { continue; }
+      const t = (j + 0.5) * dl; out.push([rr * Math.cos(t), rr * Math.sin(t), sz]); } }
+  return out;
+}
+function buildHoles() {
+  const Ns = mixed ? [8, 6, 12, 10] : [8, 8, 8, 8];
+  // layer 1 (nearest the light) is cut mostly away so it never blocks the source; the others keep their density
+  const SH = opaque ? [openShare, 0.42, 0.54, 0.66] : [openShare, 0.42, 0.42, 0.42], SC = [0.34 + openShare * 0.15, 0.41, 0.41, 0.41];
+  if (style === 1) {
+    const w0 = 0.02 + (openShare - 0.4) * 0.07;
+    const NH = [5, 7, 6, 9], WO = [w0, 0.034, 0.026, 0.022], WT = [w0, 0.026, 0.023, 0.02];
+    holes = seeds.map(function (s, i) { return opaque ? makeHeartSoul(seeds[0], 7, WO[i]) : makeHeartSoul(s, NH[i], WT[i]); });
+    return;
+  }
+  if (symMode === 2) {
+    holes = seeds.map(function (s, i) {
+      return opaque ? makeFree(seeds[0], 96, 20, SH[i], SC[i]) : makeFree(s, [72, 90, 110, 132][i], [15, 18, 21, 24][i], SH[i], SC[i]); });
+    return;
+  }
+  holes = seeds.map(function (s, i) { return makeHoles(opaque ? seeds[0] : s, Ns[i], SH[i], SC[i]); });
+}
+function shade(hex, f) { const n = parseInt(hex.slice(1), 16); return 'rgb(' + Math.round((n >> 16) * f) + ',' + Math.round(((n >> 8) & 255) * f) + ',' + Math.round((n & 255) * f) + ')'; }
+function buildImages() {
+  imgsK = buildSet(function () { return '#000'; });
+  imgs = buildSet(function (i) { return opaque ? shade(PALS[pal][i], 0.55 + 0.45 * i / (K - 1)) : PALS[pal][i]; });
+  dirty = true;
+}
+function buildSet(fillFn) {
+  return holes.map(function (hs, i) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 640;
+    const x = cv.getContext('2d'), h = 320;
+    x.fillStyle = fillFn(i); x.beginPath(); x.arc(h, h, h, 0, 7); x.fill();
+    x.globalCompositeOperation = 'destination-out';
+    x.beginPath(); x.arc(h, h, 0.035 * h, 0, 7); x.fill();
+    hs.forEach(function (p) { x.beginPath(); x.arc(h + p[0] * h, h + p[1] * h, p[2] * h, 0, 7); x.fill(); });
+    return cv; });
+}
+function renderA() {
+  a.globalCompositeOperation = 'source-over'; a.fillStyle = '#0b0a10'; a.fillRect(0, 0, S, S);
+  const g = a.createRadialGradient(C, C, 0, C, C, RAD[0]); g.addColorStop(0, lightCol); g.addColorStop(1, lightCol);
+  a.fillStyle = g; a.beginPath(); a.arc(C, C, RAD[0], 0, 7); a.fill();
+  a.globalCompositeOperation = opaque ? 'source-over' : 'multiply';
+  if (opaque) { a.shadowColor = 'rgba(0,0,0,.65)'; a.shadowBlur = 10 + gapMM * 0.5; a.shadowOffsetY = 2 + gapMM * 0.15; }
+  for (let i = 0; i < K; i++) { a.save(); a.translate(C + offX(i), C); a.rotate(ang[i]);
+    a.drawImage(imgs[i], -RAD[i], -RAD[i], 2 * RAD[i], 2 * RAD[i]); a.restore(); }
+  a.globalCompositeOperation = 'source-over'; a.shadowColor = 'rgba(0,0,0,0)'; a.shadowBlur = 0; a.shadowOffsetY = 0; a.lineWidth = 2;
+  for (let i = 0; i < K; i++) { a.strokeStyle = 'rgba(0,0,0,.55)'; a.beginPath(); a.arc(C + offX(i), C, RAD[i], 0, 7); a.stroke();
+    a.save(); a.translate(C + offX(i), C); a.rotate(ang[i]); a.fillStyle = '#fff'; a.beginPath(); a.arc(RAD[i] - 7, 0, 3.2, 0, 7); a.fill(); a.restore(); }
+}
+// the gap matters twice: seen from an angle the layers shift apart (parallax), and
+// from a point light each layer casts a different-sized shadow (nearer = bigger)
+function offX(i) { return Math.tan(viewDeg * Math.PI / 180) * gapMM * i * 3.8; }
+const Z_WALL = 1500, L0 = 60, PHYS = RAD.map(function (r) { return r / 3.8; });
+function renderP() {
+  const w = P.width, c = w / 2, z = function (i) { return L0 + i * gapMM; }, k = 340 / (PHYS[0] / z(0));
+  p.globalCompositeOperation = 'source-over'; if ('filter' in p) { p.filter = 'none'; }
+  const wl = p.createLinearGradient(0, 0, w, w); wl.addColorStop(0, '#2b2620'); wl.addColorStop(1, '#14110e');
+  p.fillStyle = wl; p.fillRect(0, 0, w, w);
+  p.fillStyle = lightCol; p.beginPath(); p.arc(c, c, 340, 0, 7); p.fill();
+  p.globalCompositeOperation = 'multiply';
+  const pxmm = 340 / (PHYS[0] * Z_WALL / z(0));
+  for (let i = 0; i < K; i++) {
+    const rad = PHYS[i] / z(i) * k, pen = lightMM * (Z_WALL - z(i)) / z(i) * pxmm;
+    if ('filter' in p) { p.filter = pen > 0.4 ? 'blur(' + (pen / 2).toFixed(1) + 'px)' : 'none'; }
+    p.save(); p.translate(c, c); p.rotate(ang[i]); p.drawImage((opaque ? imgsK : imgs)[i], -rad, -rad, 2 * rad, 2 * rad); p.restore();
+  }
+  p.globalCompositeOperation = 'source-over'; if ('filter' in p) { p.filter = 'none'; }
+}
+function renderB() {
+  const w = B.width, h = B.height, cx = w / 2, rx = w * 0.34, ry = rx * 0.3, gap = 60 + gapMM * 1.6, base = h - 70;
+  b.clearRect(0, 0, w, h);
+  b.strokeStyle = 'rgba(255,235,190,.35)'; b.setLineDash([5, 7]); b.lineWidth = 2;
+  [-0.7, -0.3, 0.3, 0.7].forEach(function (f) { b.beginPath(); b.moveTo(cx + f * rx, base); b.lineTo(cx + f * rx, base - gap * K - 10); b.stroke(); });
+  b.setLineDash([]);
+  const g = b.createRadialGradient(cx, base, 4, cx, base, rx); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,220,150,.15)');
+  b.fillStyle = g; b.beginPath(); b.ellipse(cx, base, rx, ry, 0, 0, 7); b.fill();
+  b.strokeStyle = '#b8b0a4'; b.lineWidth = 5; b.beginPath(); b.moveTo(cx, base); b.lineTo(cx, base - gap * K - 4); b.stroke();
+  b.font = '20px system-ui,sans-serif'; b.fillStyle = '#b8b0a4'; b.fillText('light', 8, base + 7);
+  for (let i = 0; i < K; i++) {
+    const y = base - (i + 1) * gap, rr = rx * RAD[i] / RAD[0];
+    b.save(); b.translate(cx, y); b.scale(1, 0.3); b.rotate(ang[i]); b.globalAlpha = 0.93;
+    b.drawImage(imgs[i], -rr, -rr, 2 * rr, 2 * rr); b.restore();
+    b.fillStyle = PALS[pal][i]; b.fillRect(8, y - 9, 14, 14);
+    b.fillStyle = '#b8b0a4'; b.textAlign = 'right';
+    b.fillText(Math.round(((ang[i] * 180 / Math.PI) % 360 + 360) % 360) + '°', w - 8, y + 7); b.textAlign = 'left'; }
+}
+// drag a tier's rim (or the front disc) to rotate that layer
+let drag = null;
+function pt(e) { const r = A.getBoundingClientRect(), k = S / r.width; return [(e.clientX - r.left) * k - C, (e.clientY - r.top) * k - C]; }
+A.addEventListener('pointerdown', function (e) {
+  const q = pt(e); let L = -1;
+  for (let i = K - 1; i >= 0; i--) { if (Math.hypot(q[0] - offX(i), q[1]) <= RAD[i]) { L = i; break; } }
+  const p = q;
+  if (L < 0) { return; }
+  drag = { L: L, a0: Math.atan2(p[1], p[0] - offX(L)), s0: ang[L] }; A.setPointerCapture(e.pointerId); A.style.cursor = 'grabbing'; });
+A.addEventListener('pointermove', function (e) {
+  if (!drag) { return; } const p = pt(e);
+  ang[drag.L] = drag.s0 + Math.atan2(p[1], p[0] - offX(drag.L)) - drag.a0; dirty = true; });
+A.addEventListener('pointerup', function () { drag = null; A.style.cursor = 'grab'; });
+function toggle(id, fn) { document.getElementById(id).addEventListener('click', fn); }
+toggle('drift', function (e) { drift = !drift; e.target.classList.toggle('on', drift); });
+toggle('mix', function (e) { symMode = (symMode + 1) % 3; mixed = symMode === 1; e.target.textContent = 'Symmetry: ' + ['same', 'mixed', 'none'][symMode]; buildHoles(); buildImages(); });
+toggle('pal', function () { pal = (pal + 1) % PALS.length; buildImages(); });
+toggle('roll', function () { seeds = seeds.map(function () { return Math.floor(Math.random() * 1e9); }); buildHoles(); buildImages(); });
+toggle('zero', function () { ang = [0, 0, 0, 0]; dirty = true; });
+[['gap', 'gv', function (v) { gapMM = v; }], ['lit', 'lv', function (v) { lightMM = v; }], ['vie', 'vv', function (v) { viewDeg = v; }]].forEach(function (s) {
+  const el = document.getElementById(s[0]);
+  el.addEventListener('input', function () { s[2](+el.value); document.getElementById(s[1]).textContent = el.value; dirty = true; }); });
+// one slider per layer, kept in sync with dragging
+const angWrap = document.getElementById('ang'), sl = [], sv = [], sw = [];
+for (let i = 0; i < K; i++) {
+  const row = document.createElement('label'); row.className = 'ar';
+  row.innerHTML = '<i></i>L' + (i + 1) + '<input type="range" min="0" max="359" value="0"><b>0°</b>';
+  angWrap.appendChild(row); sw.push(row.querySelector('i')); sl.push(row.querySelector('input')); sv.push(row.querySelector('b'));
+  sl[i].addEventListener('input', function () { ang[i] = (+sl[i].value) * Math.PI / 180; dirty = true; });
+}
+function syncSliders() {
+  for (let i = 0; i < K; i++) {
+    const v = Math.round(((ang[i] * 180 / Math.PI) % 360 + 360) % 360) % 360;
+    if (document.activeElement !== sl[i]) { sl[i].value = v; }
+    sv[i].textContent = v + '°'; sw[i].style.background = PALS[pal][i];
+  }
+}
+// the wall projection can be dragged too
+function projRad(i) { return PHYS[i] / (L0 + i * gapMM) * (340 / (PHYS[0] / L0)); }
+let pdrag = null;
+function pq(e) { const r = P.getBoundingClientRect(), k = P.width / r.width; return [(e.clientX - r.left) * k - C, (e.clientY - r.top) * k - C]; }
+P.addEventListener('pointerdown', function (e) {
+  const q = pq(e), d = Math.hypot(q[0], q[1]); let L = -1;
+  for (let i = K - 1; i >= 0; i--) { if (d <= projRad(i)) { L = i; break; } }
+  if (L < 0) { return; }
+  pdrag = { L: L, a0: Math.atan2(q[1], q[0]), s0: ang[L] }; P.setPointerCapture(e.pointerId); });
+P.addEventListener('pointermove', function (e) {
+  if (!pdrag) { return; } const q = pq(e);
+  ang[pdrag.L] = pdrag.s0 + Math.atan2(q[1], q[0]) - pdrag.a0; dirty = true; });
+P.addEventListener('pointerup', function () { pdrag = null; });
+// pin the current projection, then rotate and see exactly what changed
+const Sc = document.getElementById('Sc'), Dc = document.getElementById('Dc'), s2 = Sc.getContext('2d'), d2 = Dc.getContext('2d');
+const tmp = document.createElement('canvas'); tmp.width = tmp.height = 200;
+const t2 = tmp.getContext('2d', { willReadFrequently: true });
+let pinData = null;
+function small() { t2.drawImage(P, 0, 0, 200, 200); return t2.getImageData(0, 0, 200, 200); }
+document.getElementById('pin').addEventListener('click', function () {
+  s2.drawImage(P, 0, 0, 400, 400); pinData = small();
+  document.getElementById('pf').hidden = false; document.getElementById('df').hidden = false; dirty = true; });
+document.getElementById('unpin').addEventListener('click', function () {
+  pinData = null; document.getElementById('pf').hidden = true; document.getElementById('df').hidden = true; });
+function renderDiff() {
+  if (!pinData) { return; }
+  const cur = small(), out = d2.createImageData(200, 200), c1 = cur.data, p1 = pinData.data, o = out.data;
+  for (let i = 0; i < o.length; i += 4) {
+    const d = (Math.abs(c1[i] - p1[i]) + Math.abs(c1[i + 1] - p1[i + 1]) + Math.abs(c1[i + 2] - p1[i + 2])) / 3;
+    o[i] = Math.min(255, d * 2); o[i + 1] = Math.min(255, d * 1.5); o[i + 2] = Math.min(255, d * 0.8); o[i + 3] = 255;
+  }
+  d2.putImageData(out, 0, 0);
+}
+const LC = ['#fff3dc', '#8fd3ff', '#ff9ec0', '#b9ff9f'];
+let lci = 0, lightCol = LC[0];
+const MN = ['Translucent: each layer filters the light, so colours mix where layers overlap.',
+  'Opaque: light only gets through where the holes in every layer line up. Elsewhere you see the painted face of the front-most layer, with shadows falling on the layers behind. The layers share one pattern with different amounts cut away, so when aligned the full design glows, and turning any layer closes the openings.'];
+document.getElementById('mn').textContent = MN[0];
+toggle('mat', function (e) { opaque = !opaque; e.target.textContent = 'Material: ' + (opaque ? 'opaque' : 'translucent'); document.getElementById('mn').textContent = MN[opaque ? 1 : 0]; buildHoles(); buildImages(); });
+toggle('lc', function () { lci = (lci + 1) % LC.length; lightCol = LC[lci]; dirty = true; });
+document.getElementById('opn').addEventListener('input', function (e) { openShare = e.target.value / 100; document.getElementById('ov').textContent = e.target.value; buildHoles(); buildImages(); });
+toggle('sty', function (e) { style = 1 - style; e.target.textContent = 'Style: ' + (style ? 'heart & soul' : 'cells'); buildHoles(); buildImages(); });
+// ---- laser export: trace the cut slots into clean outlines, in millimetres ----
+let dlCap = null;
+const lz = document.getElementById('lz'), lmsg = document.getElementById('lmsg');
+function dpLine(p, tol) {
+  if (p.length < 3) { return p; }
+  const a = p[0], b = p[p.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], Ln = Math.hypot(dx, dy) || 1e-9;
+  let mi = 0, md = 0;
+  for (let i = 1; i < p.length - 1; i++) { const d = Math.abs((p[i][0] - a[0]) * dy - (p[i][1] - a[1]) * dx) / Ln; if (d > md) { md = d; mi = i; } }
+  if (md <= tol) { return [a, b]; }
+  return dpLine(p.slice(0, mi + 1), tol).slice(0, -1).concat(dpLine(p.slice(mi), tol));
+}
+function simpClosed(p, tol) {
+  let f = 0, fd = 0;
+  for (let i = 1; i < p.length; i++) { const d = Math.hypot(p[i][0] - p[0][0], p[i][1] - p[0][1]); if (d > fd) { fd = d; f = i; } }
+  return dpLine(p.slice(0, f + 1), tol).slice(0, -1).concat(dpLine(p.slice(f).concat([p[0]]), tol).slice(0, -1));
+}
+function traceLoops(g, P) {   // marching squares: outline every hole as a closed loop
+  const KK = 2 * P + 4, adj = new Map();
+  const add = function (u, v) { if (!adj.has(u)) { adj.set(u, []); } if (!adj.has(v)) { adj.set(v, []); } adj.get(u).push(v); adj.get(v).push(u); };
+  for (let j = 0; j < P - 1; j++) {
+    for (let i = 0; i < P - 1; i++) {
+      const c = g[j * P + i] * 8 + g[j * P + i + 1] * 4 + g[(j + 1) * P + i + 1] * 2 + g[(j + 1) * P + i];
+      if (c === 0 || c === 15) { continue; }
+      const T = (2 * i + 1) * KK + 2 * j, Rr = (2 * i + 2) * KK + 2 * j + 1, B = (2 * i + 1) * KK + 2 * j + 2, L = (2 * i) * KK + 2 * j + 1;
+      switch (c) {
+        case 1: case 14: add(L, B); break;
+        case 2: case 13: add(B, Rr); break;
+        case 3: case 12: add(L, Rr); break;
+        case 4: case 11: add(T, Rr); break;
+        case 5: add(T, L); add(B, Rr); break;
+        case 6: case 9: add(T, B); break;
+        case 7: case 8: add(T, L); break;
+        case 10: add(T, Rr); add(L, B); break;
+      }
+    }
+  }
+  const seen = new Set(), loops = [];
+  adj.forEach(function (nb0, start) {
+    if (seen.has(start)) { return; }
+    const pts = []; let prev = -1, cur = start;
+    for (let guard = 0; guard < 600000 && cur !== undefined; guard++) {
+      seen.add(cur); pts.push([Math.floor(cur / KK) / 2, (cur % KK) / 2]);
+      const nb = adj.get(cur), nx = nb[0] === prev ? nb[1] : nb[0];
+      prev = cur; cur = nx;
+      if (cur === start) { break; }
+    }
+    loops.push(pts);
+  });
+  return loops;
+}
+function layerBody(i, D0, axle) {
+  const Rmm = D0 / 2 * RAD[i] / RAD[0], n = Math.min(1800, Math.round(2 * Rmm / 0.2)), s = 2 * Rmm / n;
+  const cv = document.createElement('canvas'); cv.width = cv.height = n;
+  const x = cv.getContext('2d', { willReadFrequently: true });
+  x.fillStyle = '#fff'; x.fillRect(0, 0, n, n); x.fillStyle = '#000'; x.beginPath();
+  holes[i].forEach(function (q) {
+    if (q[0] === 0 && q[1] === 0) { return; }   // the axle hole replaces the centre dot
+    const cx = n / 2 + q[0] * n / 2, cy = n / 2 + q[1] * n / 2, rr = q[2] * n / 2;
+    x.moveTo(cx + rr, cy); x.arc(cx, cy, rr, 0, 7);
+  });
+  x.fill();
+  const d = x.getImageData(0, 0, n, n).data, P = n + 2, g = new Uint8Array(P * P);
+  for (let yy = 0; yy < n; yy++) { for (let xx = 0; xx < n; xx++) { if (d[(yy * n + xx) * 4] < 128) { g[(yy + 1) * P + xx + 1] = 1; } } }
+  let path = '';
+  traceLoops(g, P).forEach(function (Lp) {
+    if (Lp.length < 8) { return; }
+    const pts = simpClosed(Lp.map(function (q) { return [(q[0] - 0.5 - n / 2) * s, (q[1] - 0.5 - n / 2) * s]; }), 0.04);
+    if (pts.length < 3) { return; }
+    path += 'M' + pts.map(function (q) { return q[0].toFixed(2) + ' ' + q[1].toFixed(2); }).join('L') + 'Z';
+  });
+  // order matters for cutting: slots first, then the axle hole, then the outer edge
+  return { R: Rmm, svg: '<g id="CUT" fill="none" stroke="#ff0000" stroke-width="0.1"><path d="' + path + '"/><circle r="' + (axle / 2) + '"/><circle r="' + Rmm.toFixed(2) + '"/></g>' };
+}
+function saveSVG(name, svg) {   // plain browser download
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  const link2 = document.createElement('a');
+  link2.href = url; link2.download = name; document.body.appendChild(link2); link2.click(); link2.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  lmsg.textContent = 'Saved ' + name + ' to your downloads folder.';
+}
+function exportLayers(which) {
+  const D0 = +document.getElementById('dia').value, ax = +document.getElementById('axl').value;
+  lmsg.textContent = 'Preparing the cut lines...';
+  setTimeout(function () {
+    const head = '<?xml version="1.0" encoding="UTF-8"?>\n<!-- units: mm. red = cut. ' + (opaque ? 'opaque' : 'translucent') + ', ' + (style ? 'heart and soul' : 'cells') + ' -->\n';
+    if (which === 'all') {
+      const cell = D0 + 12, s = 2 * cell; let body = '';
+      for (let i = 0; i < K; i++) {
+        const b = layerBody(i, D0, ax);
+        body += '<g transform="translate(' + (cell / 2 + (i % 2) * cell) + ' ' + (cell / 2 + Math.floor(i / 2) * cell) + ')">' + b.svg + '</g>\n';
+      }
+      saveSVG('layers-sheet.svg', head + '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + 'mm" height="' + s + 'mm" viewBox="0 0 ' + s + ' ' + s + '">\n' + body + '</svg>\n');
+    } else {
+      const b = layerBody(which, D0, ax), h = (b.R + 6).toFixed(2);
+      saveSVG('layer-' + (which + 1) + '.svg', head + '<svg xmlns="http://www.w3.org/2000/svg" width="' + 2 * h + 'mm" height="' + 2 * h + 'mm" viewBox="-' + h + ' -' + h + ' ' + 2 * h + ' ' + 2 * h + '">\n' + b.svg + '\n</svg>\n');
+    }
+  }, 30);
+}
+Array.prototype.forEach.call(document.querySelectorAll('#lz button'), function (b) {
+  b.addEventListener('click', function () { exportLayers(b.dataset.l === 'all' ? 'all' : +b.dataset.l); });
+});
+[['dia', 'dv'], ['axl', 'xv']].forEach(function (s) {
+  const el = document.getElementById(s[0]);
+  el.addEventListener('input', function () { document.getElementById(s[1]).textContent = el.value; });
+});
+const SPD = [0.00012, -0.00019, 0.00027, -0.00041];   // incommensurate speeds: the pattern never repeats
+let last = performance.now();
+function loop(t) {
+  const dt = t - last; last = t;
+  if (drift) { for (let i = 0; i < K; i++) { ang[i] += SPD[i] * dt; } dirty = true; }
+  if (dirty) { syncSliders(); renderA(); renderP(); renderB(); renderDiff(); dirty = false; }
+  requestAnimationFrame(loop);
+}
+buildHoles(); buildImages(); ang = [0, 0.35, 0.9, 1.6]; requestAnimationFrame(loop);
+</script></body></html>
